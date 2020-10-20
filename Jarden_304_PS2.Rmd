@@ -1,0 +1,240 @@
+---
+title: 'Whether married with older partner has a better life feeling than younger ones?'
+author: 'Yangming Hu'
+date: '2020-10-19'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+```
+
+
+
+# Abstract 
+
+This study investigated the question of interest that whether married with older partner has a better life feeling. The study mainly applied statistical approaches based on linear regression models to study the question of interest. It was found that there are strong evidence show the facts that people married with no younger partner are indeed have a better average life feeling score than those married with younger partner significantly. This finding suggests people should find no younder partner than themselves if they want to find a higher level of life feeling in their future life.
+
+# Introduction
+
+It is widely know that for marriages especailly in morden days, people is not constrained to find partners with the same ages as themselves. Married with people much younger or older than themselves become common things in recent years. One of potential reasons is that it is claimed married with older poeple would be more happier than married with younger ones. This study investigated this question of interest applied linear regression models. It was found that controlled lots of important covariates such as age, gender, education level, income, hours of work and etc, the study shows that married with no younger partner are indeed have a better average life feeling score than those married with younger partner. This is important as it suggests that people should find no younder partner than themselves if they want to find a higher level of life feeling in their future life. The study was organized as following: the introduction section introduced the goal of the study and main findings, methods used. The data section introduced the data and discussions. The model section introduced the linear regression model used in the study and gave discussions. Results section illustrated all of the results obtained in the study and finally, the discussion section discussed the findings, the weakness of the study and the possible future work. The study is originally hold in the link: 
+https://github.com/Jaydenhu123/STA304_PS2/blob/main/Jarden_304_PS2.pdf.
+
+# Data
+
+
+The source of the data studied in the study is the  2017 Canadian General Social Survey Data. The GSS data contains many instances with lots of variables. This study did the work based on the Rohan Alexander and Sam Caetano (2020). The response is the feeling score of life  which is an ordinal scaled variable from 0 to 10 and the categorical factor with 3 levels - older, same and younger aged partners as the main interested variable. The models also include various of important covariates such as age, gender, education, income and etc.
+
+The 2017 GSS survey is well-tested and designed that the answers covered lots of information of peersons which are important. However, there are also lots of non-responses to some questions. The target population of the survey is all of the people living in the 10 provinces of Canada with ages no younger than 15. The frame is a list of landline and cellular telephone numbers in Canada. The samples are the units collected by the survey.
+
+
+The survey used a  stratified sampling method that it divides Canada into several areas and draw samples in the strata of these areas. There are non-responses problems that not all of people might be studied, if people do not have telephone numbers. Also, people who are not want to answer the questions are not investigated, and the non-answers to questions also cause non-response bias. The survey deal with these non-response bias by using methods like estimation instead of actual values, it is a good trade-off as some responses could be estimated from other sources such as tax files and etc. Table 1 shows a summary of the features of the data used in this study.
+
+```{r}
+library(readr)
+library(dplyr)
+library(stargazer)
+library(knitr)
+library(ggplot2)
+library(ggthemes)
+library(mlr)
+#load data carefully dealing with possible missing values
+dt <- read_csv("gss.csv", 
+       na = c(""," ","NA","Don't know",
+              "N/A","NULL"))
+#variables selection
+df <-  dplyr::select(dt, age, age_diff, 
+                      feelings_life, number_marriages, 
+                      children_in_household, 
+                      lives_with_partner, 
+                      sex,own_rent,average_hours_worked,
+                      education,income_family,
+                      self_rated_health,
+                      self_rated_mental_health) %>% 
+                      data.frame()
+#transformed covariates
+df <- df %>% transform(
+          education = ifelse(education %in%
+                          c("Bachelor's degree (e.g. B.A., B.Sc., LL.B.)",
+                            "University certificate, diploma or degree above the bach..."), "Above Bachelor","Below Bachelor"),
+         own_rent = ifelse(own_rent  == 
+                             "Rented, even if no cash rent is paid","Rented","Owned"))
+
+#transform main interested variable
+df$age_diff2 <- df$age_diff
+df$age_diff2[grep("older",df$age_diff)] <- "older"
+df$age_diff2[grep("younger",df$age_diff)] <- "younger"
+df$age_diff2[grep("same",df$age_diff)] <- "same"
+df$age_diff  <- df$age_diff2
+df$age_diff2 <- NULL
+
+
+#remove missing values
+df <- na.omit(df)
+
+#convert strings into factors
+for(i in 1:ncol(df)) {
+  if(is.character(df[,i])) df[,i] <- factor(df[,i])
+}
+df$age_diff <- factor(df$age_diff, levels = c("same","younger","older"))
+#summarise of the data
+
+summarizeColumns(df)[,-c(3,7)] %>% knitr::kable(digit=2,caption = 'Summary of features')
+
+```
+
+
+# Model
+
+The linear regression model in the study uses the feeling score of life as the response which is an ordinal scaled variable from 0 to 10 and the categorical factor with 3 levels - older, same and younger aged partners as the main interested variable. The models also include various of important covariates. The inear regression model is described as below:
+
+
+$$y = \beta_0 + \beta_1 x_1 + ... + \beta_k x_p + \epsilon$$
+
+
+
+where y is feeling score of life, x are various covarites and the main interested facor age difference. The $\epsilon$ is i.i.d. ~ N(0,$\sigma^2$). And for model checks and diagnostics, main the 5 aspects are investigated:
+
+1)	independent assumption: the observations should be independent 
+
+2)	linearity assumption: the relationship between response and factors should be linearity
+
+3)	constant variance assumption: the residuals should have the constant variance
+
+4)	normality assumption: the residuals should follow normal distribution
+
+5)  unsual points: there are should no outliers, influence points
+
+And in this study, the above assumptions are mainly checked using model diagnostic plots. The whole procedure of model building, model diagnostics are performed in the R software which is designed originally for statistical analysis. At last, linear regression model is choosen among different types of model because it is suitable for the topic and very easy to interpret, other models like bayes models are too complicated and time costing in fitting big data set, also there are no special prior information in this study. 
+
+# Results
+
+
+```{r, fig.cap="Distribution of the interested factor age difference. There are three levels - older, same and younger indicating the invidiuals have partner with a older, same and younger age respectively"}
+d <- aggregate(age ~ age_diff, data = df, length)
+colnames(d)[2] <- "count"
+d %>% ggplot(aes(age_diff,count,fill=age_diff)) + geom_col() + theme_economist() +
+  theme(legend.position = "none") + xlab("age difference") 
+```
+
+Figure 1 shows the distribution of the interested factor age difference. There are three levels - older, same and younger indicating the invidiuals have partner with a older, same and younger age respectively. It shows the data has more instances married with people having older or younger age than the instances themselves. 
+
+
+```{r, fig.cap="Distribution of the life feeling score grouped by the interested factor age difference. The distributions are across the three levels of older, same and younger age difference respectively"}
+df%>% ggplot(aes(age_diff,feelings_life,fill=age_diff)) + geom_boxplot() + theme_economist() + theme(legend.position = "none") + xlab("age difference") + ylab("life feeling score")
+```
+
+Figure 2 shows the distribution of the life feeling score grouped by the interested factor age difference. The distributions are across the three levels of older, same and younger age difference respectively. Just from the boxes, it appears that the three levels have similar distributions of life feeling score, however, if look carefully, it can be found the average median levels of life feeling scores are different across the three levels of age difference.
+
+
+```{r}
+m1 <- lm(feelings_life ~ age_diff, data = df)
+kable(summary(m1)$coef,digit=3,caption="Simple linear model with only interested factor age difference")
+```
+
+Table 2 shows the estimates of simple linear model with only interested factor age difference. The two dummy variables older and younger levels are both significant at a level of 10% but not signiicant at a level of 5%.
+
+```{r}
+m2 <- lm(feelings_life ~ ., data = df)
+kable(summary(m2)$coef,digit=3,caption="Full linear model with interested factor age difference along with all of covariates")
+```
+
+Table 3 shows the estimates of full linear model with interested factor age difference along with all of covariates but no interaction effects. Now, only the dummy variable older is significant at a level of 10%. Also, it can be found lots of covariates are significant indicating they are important covariates which should be inlcuded in the model.
+
+
+```{r}
+m3 <- step(m2, scope = list(lower = m1), trace = 0)
+kable(summary(m3)$coef,digit=3,caption="Best subset linear model with interested factor age difference along with selected covariates")
+```
+
+Table 4 shows the estimates of best subset linear model selected by AIC backward approach with interested factor age difference along with selected covariates. Still, the results are similar with the previous full model that only the dummy variable older is significant at a level of 10%. 
+
+```{r}
+m4 <- lm(formula = feelings_life ~ (.)* age_diff, data = df)
+m5 <- step(m4, scope = list(lower = m1), trace = 0)
+kable(summary(m5)$coef,digit=3,caption="Best subset linear model with interested factor age difference along with selected covariates as well as interactions among them")
+```
+
+Table 5 also consider various different interactions between the interested factor age difference with the covariates. It shows the best subset linear model by AIC backward approach with interested factor age difference along with covariates as well as interactions between the interested factor age difference with the covariates. The result shows that there are some significant interaction effects in the model, and the age difference dummy variable younger level is very significant with p value less than 0.05. The model result shows that fixed other factors, the main effect of married with younger partner is significantly negative that the average level of life feeling score is about 0.822 units lower than that of married with same aged partner. For married older partner, there is also a negative effect but it is not significant with a p value larger than 0.05.
+
+
+```{r}
+p <- which(abs(rstudent(m5)) > 2)
+m6 <- lm(formula = feelings_life ~ age + age_diff + number_marriages + 
+    children_in_household + lives_with_partner + sex + own_rent + 
+    education + income_family + self_rated_health + self_rated_mental_health + 
+    age:age_diff + age_diff:children_in_household + age_diff:lives_with_partner + 
+    age_diff:own_rent + age_diff:self_rated_health + age_diff:self_rated_mental_health, 
+    data = df[-p,])
+kable(summary(m6)$coef,digit=3,caption="Best subset linear model with interested factor age difference along with selected covariates as well as interactions among them after dropping outliers with absolute standardized residuals larger than 2")
+```
+
+However, the findings in table 5 might be affected by outlers, table 6 shows the  best subset linear model by AIC backward approach with interested factor age difference along with covariates as well as interactions between the interested factor age difference with the covariates after removing outliers with absolute standardized residuals larger than 2. And it can be found that only the estimates changed a little between the models in table 5 and table 6, the directions, significances of the interested factor are the same. So this means that after removing the outliers, the inferences are still consistent.
+
+
+# Discussion
+
+After all of the above work. First, we dicuss the validation of the model obtained which is very important as model fail to pass the model checks are meaningless. And there are mainly 4 assumptions checked in this study.
+
+1)	independent assumption: the top left residuals plot in the figure 3 shows that the residuals points are randomly distributed arouned the zero mean line, it means there is no denepdent pattern.
+
+2)	linearity assumption: the top left residuals plot in the figure 3 shows there is no special curve pattern, the linearity asumption is true. 
+
+3)	constant variance assumption: the top left residuals plot in the figure 3 shows that the spread of residuals does not change across x-axis obviously, the constant variance assumption is true.
+
+4)	normality assumption:  the top right normal Q-Q plot in the figure 3 shows that the residuals fit the straight line well overall except some points far from the two ends, however, in practice, the results are robust in these cases, the normality assumption is acceptable.
+
+Besides the 4 main assumptions,  unusual data points could also be checked, the residuals plot and normal Q-Q plots show no residuals have obviously large absolute residuals. However, the bottom right leverage plot shows there are some possible high leverage points, the bottom left cook's distance plot shows there are some possible strong influence points. Future work of deal with these possible unusual data points could be investigated to improve the fitness of the model.
+
+
+```{r, fig.cap="Model diagnostics for the final linear regression model", fig.height=5.6}
+par(mfrow = c(2,2))
+plot(m6, c(1,2,4,5))
+par(mfrow = c(1,1))
+```
+
+Second, we dicuss about the procedures of the models. A simple linear model without covariates was not enough to investigate the goal of the study as there are many important covariate not included in the model which could cause omitted variables bias, it is the same for only considering first order linear regression model without adding interation effects. In our study, there are significant different results obtained between a model with interaction effects and a model without considering interaction effects. However, high order terms are not considered in this study anymore. Future work could study this problem to improve the model.
+
+At last, we dicussed some weaknesses in the study. The study is performed on a subset of 2017 GSS data, however, this data is known to have non-response bias and adjusted by some estimations, if the adjusted results are not close to the actual ones, then it would lead seriously biasness in our final model, thus, the inferences based on the final model are not reliable anymore. There are some procedures of recoding variables in this study, different designs of recoding might result in different results and inferences.  Also the response in this study is an ordinal response variable scaled from 0 to 10, the range is not wide enough for linear regression models. 
+
+However, the findings in this study might be still useful that it shows married with same aged partner has significantly higher level of life feeling score than married with younger partner, although there is no significant difference between same aged partner and older partner, the finding already indicates the facts that people married with no younger partner are indeed have a better average life feeling score than those married with younger partner significantly. 
+
+
+\newpage
+
+# References
+
+
+1. Alboukadel Kassambara (2019). ggpubr: 'ggplot2' Based Publication Ready Plots. 
+R package version 0.2.4. https://CRAN.R-project.org/package=ggpubr
+
+2. Hadley Wickham, Jim Hester and Romain Francois (2018). readr: Read Rectangular Text Data. R package version 1.3.1. https://CRAN.R-project.org/package=readr
+
+3. Hadley Wickham (2016). ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York.
+
+4. Hadley Wickham, Romain Franois, Lionel Henry and Kirill Muller (2019). dplyr: A Grammar of Data Manipulation. R package version 0.8.3. https://CRAN.Rproject.org/package=dplyr
+
+
+5. Hlavac, Marek (2018). stargazer: Well-Formatted Regression and Summary Statistics Tables. R package version 5.2.1. https://CRAN.R-project.org/package=stargazer
+
+6. Jeffrey B. Arnold (2019). ggthemes: Extra Themes, Scales and Geoms for 'ggplot2'. R package version
+  4.2.0. https://CRAN.R-project.org/package=ggthemes
+  
+7. Probst P, Au Q, Casalicchio G, Stachl C, Bischl B (2017). "Multilabel Classification with R Package
+mlr." 
+
+8. R Core Team (2019). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+9. Rohan Alexander and Sam Caetano (2020). Source R code for cleaning 2017 GSS Survey Data.
+
+10. Yihui Xie (2020). knitr: A General-Purpose Package for Dynamic Report Generation in R. R package version 1.27.
+
+
+# Appendix 
+
+The Github repo link for the source files of the study cound be found in the website:  https://github.com/Jaydenhu123/STA304_PS2/. 
+
+
+
